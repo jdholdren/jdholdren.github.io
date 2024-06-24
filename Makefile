@@ -4,7 +4,7 @@ dev:
 	smolblog -manifest=manifest.json
 
 tools:
-	go install github.com/jdholdren/smolblog@v0.2.1
+	go install github.com/jdholdren/smolblog@latest
 
-build:
-	smolblog -manifest=manifest.json -output=build
+docs:
+	smolblog -manifest=manifest.json -output=docs
