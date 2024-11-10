@@ -1,0 +1,227 @@
+
+<!DOCTYPE HTML>
+<html lang="en">
+
+<head>
+  <title>Smolblog</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <meta name="description" content="The smallest webserver around Go templates powering my site.">
+  <link rel="stylesheet" href="/static/css/main.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+</head>
+
+<body>
+<header>
+	<nav class="menu with-gutter">
+    	<a href="/"><div class="link ">About Me</div></a>
+        <a href="/posts.html"><div class="link ">Posts</div></a>
+        <a href="/projects.html"><div class="link ">Projects</div></a>
+	</nav>
+</header>
+
+
+  <div class="post with-gutter">
+    <div class="publish-date">2024-11-10</div>
+    <h1 class="post-title">Smolblog</h1>
+
+    <p>Earlier in the year, I felt the annual urge to build a blogging system from scratch, called <a href="https://github.com/jdholdren/smolblog">smolblog</a>.
+Of course, there are numerous of these and this is my disclaimer that you should
+probably use one of those.
+But here we are.</p>
+<blockquote>
+<p>Previously, I had been using a homegrown static renderer that I had built in Rust as more of a <a href="https://github.com/jdholdren/blog/blob/main/LEARNED.md">learning exercise</a>.</p>
+</blockquote>
+<h1>Design Goals</h1>
+<p>So what do I want out of something that makes my blog?</p>
+<ol>
+<li>Supports static site generation</li>
+</ol>
+<p>This might be the most straightforward requirement, since once you have a site
+rendering with a server, you can use <code>wget</code> to <a href="https://web.archive.org/web/20221103040923/https://apex.sh/blog/post/pre-render-wget/">crawl it and save the rendered pages</a>.
+But most importantly, I want to host this for free, and that means using GitHub Pages.</p>
+<ol start="2">
+<li>Supports Markdown</li>
+</ol>
+<p>At this point, if it's hard to edit in Vim, I want no part of it.</p>
+<ol start="3">
+<li>Supports &quot;views&quot;</li>
+</ol>
+<p>I want to have <em>something</em> resembling a component, so I can reuse a header and footer,
+or even pieces that resemble a bit of a design system.</p>
+<h1>Enter the manifest</h1>
+<p>The heartbeat of smolblog is the <code>manifest.json</code>.
+It's a JSON file that has very little schema around it, but serves
+as the &quot;database&quot; of what gets rendered and where on your site.
+You pass this as a flag to the binary:</p>
+<pre><code class="language-bash">smolblog -manifest=manifest.json
+</code></pre>
+<p>At the top level, these are the structs that govern the layout:</p>
+<pre><code class="language-go">// Manifest is the structure of the data driving the web server.
+//
+// It has two main pieces:
+// - `layouts`, which are any templates that are globbed
+// - `rotues`, which are registered as get routes and served by the handler
+type Manifest struct {
+	Layouts []string         `json:&quot;layouts&quot;`
+	Routes  map[string]Route `json:&quot;routes&quot;`
+}
+
+// Route is a registered path that is run when a GET request is made to it.
+type Route struct {
+	// If the route is simply a static file
+	StaticPath  string `json:&quot;static_path&quot;`
+	ContentType string `json:&quot;content_type&quot;`
+	// The name of the template to execute first
+	Template string `json:&quot;template&quot;`
+	// Any arbitrary arguments to be used in executing the template
+	Args map[string]any `json:&quot;args&quot;`
+}
+</code></pre>
+<p>For your topmost keys, there's <code>layouts</code>, which tell the server what
+templates to glob and parse, and <code>routes</code>, which are the paths that the server
+recognizes for GET calls and renders as content.
+You can see the manifest for my blog <a href="https://github.com/jdholdren/jdholdren.github.io/blob/main/manifest.json">here</a>.</p>
+<p>On startup, the <code>smolblog</code> binary just starts a server that has a single <code>ServeHTTP</code> function.
+It disregards anything but a GET call.
+More importantly, it's at <em>this</em> point that the manifest is read and layouts are parsed, meaning
+any changes to your files will be reflected on the next request, similar to a <code>--watch</code> flag
+for other binaries.</p>
+<p>Once a request is received and things parse, the server checks the manifest for a matching route.
+Here, we have two modes depending on what is filled out for the route:</p>
+<ol>
+<li>If <code>StaticPath</code> is filled out, the server will serve that file with the <code>ContentType</code> header.
+Useful for stuff like CSS or javascript.</li>
+<li>Otherwise, the server will execute the <code>Template</code> with the given arguments.</li>
+</ol>
+<p>The second mode makes full use of Go's <code>html/template</code> package, which is not only very powerful,
+but also pretty easy to reason about if you keep it relatively flat.
+For example, here's the route that renders this blog post:</p>
+<pre><code class="language-json">&quot;/posts/smolblog.html&quot;: {
+  &quot;template&quot;: &quot;post&quot;,
+  &quot;args&quot;: {
+    &quot;title&quot;: &quot;Smolblog&quot;,
+    &quot;publish_date&quot;: &quot;2024-11-10&quot;,
+    &quot;description&quot;: &quot;The smallest webserver around Go templates powering my site.&quot;,
+    &quot;markdown&quot;: &quot;./posts/2024_11_10_smolblog.md&quot;
+  }
+},
+</code></pre>
+<p>We've got the <code>template</code> and <code>args</code> field filled out.
+Now here's the template for <code>post</code>:</p>
+<pre><code class="language-html">{{define &quot;post&quot;}}
+&lt;!DOCTYPE HTML&gt;
+&lt;html lang=&quot;en&quot;&gt;
+
+&lt;head&gt;
+  &lt;title&gt;{{ .Args.title }}&lt;/title&gt;
+  &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;
+  &lt;meta charset=&quot;UTF-8&quot;&gt;
+  &lt;meta name=&quot;description&quot; content=&quot;{{ .Args.description }}&quot;&gt;
+  &lt;link rel=&quot;stylesheet&quot; href=&quot;/static/css/main.css&quot;&gt;
+  &lt;link rel=&quot;preconnect&quot; href=&quot;https://fonts.googleapis.com&quot;&gt;
+  &lt;link rel=&quot;preconnect&quot; href=&quot;https://fonts.gstatic.com&quot; crossorigin&gt;
+  &lt;link rel=&quot;preload&quot; as=&quot;style&quot; href=&quot;https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&amp;display=swap&quot; rel=&quot;stylesheet&quot;&gt;
+  &lt;link href=&quot;https://fonts.googleapis.com/css2?family=Roboto&amp;display=swap&quot; rel=&quot;stylesheet&quot;&gt;
+&lt;/head&gt;
+
+&lt;body&gt;
+	{{- template &quot;header&quot; . }}
+
+  &lt;div class=&quot;post with-gutter&quot;&gt;
+    &lt;div class=&quot;publish-date&quot;&gt;{{ .Args.publish_date }}&lt;/div&gt;
+    &lt;h1 class=&quot;post-title&quot;&gt;{{ .Args.title }}&lt;/h1&gt;
+
+    {{ renderMarkdown .Args.markdown }}
+
+  &lt;/div&gt;
+
+	{{- template &quot;footer&quot; }}
+&lt;/body&gt;
+
+&lt;/html&gt;
+{{end}}
+</code></pre>
+<p>Honestly, I could probably clean this up a bit more by moving the <code>head</code> into the header template, but this makes for a good example.
+You'll notice a <code>renderMarkdown</code> call in there, which is a built-in function to <code>smolblog</code> to handle the markdown requirement.
+That might have been the simplest part of this all since it's a call to the <a href="github.com/yuin/goldmark">github.com/yuin/goldmark</a> package.</p>
+<h1>Rendering and Hosting</h1>
+<p>To render your site, just call <code>smallblog</code> with the <code>--output</code> flag, telling it where to save your generated site.
+Under the hood, it's using <code>wget</code> with a number of flags to properly use the incantation:</p>
+<pre><code class="language-go">if output != &quot;&quot; {
+		cmd := exec.Command(&quot;wget&quot;)
+		cmd.Args = []string{
+			&quot;-nv&quot;,
+			&quot;-nH&quot;,
+			&quot;-P&quot;,
+			output,
+			&quot;-r&quot;,
+			&quot;-E&quot;,
+			fmt.Sprintf(&quot;0.0.0.0:%d&quot;, port),
+		}
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf(&quot;error running wget: %s&quot;, err)
+		}
+</code></pre>
+<p>For this blog, that output is going to the <code>docs</code> directory, where <a href="https://pages.github.com/">Github Pages</a> knows to serve it from.</p>
+<h1>Future stuff</h1>
+<p>I'll be honest: for a text-based, small website with only content to read and not write,
+there's not a whole lot of motivation for me to add stuff at this time.
+Buuuuuuttt of course there's a few things on the horizon that I'd like to add:</p>
+<h2>Plugins</h2>
+<p>I want there to be a way for folks to extend this and add functions to the template rendering
+that <em>they</em> need.
+To keep it simple, this will likely mean packaging up <code>smolblog</code> as a library and allowing other people
+to make their own binary and inject their own functions.
+Something like:</p>
+<pre><code class="language-go">package main
+
+import (
+	&quot;github.com/jdholdren/smolblog&quot;
+)
+
+func main() {
+	smolblog.Run(smolblog.Config{
+		ManifestPath: &quot;manifest.json&quot;,
+		Plugins: []smolblog.Plugin{
+			{
+				Name: &quot;myplugin&quot;,
+				F: func() string {
+					return &quot;Hello from myfunc!&quot;
+				},
+			},
+		},
+	})
+}
+</code></pre>
+<p>I dunno. Something like that. I'm assuming the user is a Go person, so hopefully this is a reasonable hurdle to ask them to climb.</p>
+<h2>Images</h2>
+<p>When I want to include diagrams, I usually lean on ASCII art, but there's a future where I want to include images.
+Plus on the off-chance I feel like want to share publicly some of my photography, it'd be great to not bog down the site with
+the full resolution photos.
+I'll need to go back and look at how a static site could deliver responsive images, but it might be worth bundling
+in an image processor to ensure I'm not leaving too much burden on the user to figure all that out themselves.</p>
+<h1>That's it!</h1>
+<p>Give it a try if you think this fits <em>your</em> use case as well!
+Good luck and happy writing!</p>
+
+
+  </div>
+<footer>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-W55GV9RJ5M"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-W55GV9RJ5M');
+  </script>
+</footer>
+
+</body>
+
+</html>

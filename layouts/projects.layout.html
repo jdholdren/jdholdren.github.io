@@ -1,0 +1,30 @@
+{{define "projects"}}
+<!DOCTYPE HTML>
+<html lang="en">
+
+<head>
+	<title>Projects</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+	<meta name="description" content="All projects from James Holdren">
+	<link rel="stylesheet" href="/static/css/main.css">
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+</head>
+
+<body>
+	{{- template "header" . }}
+	<section class="with-gutter">
+		<h1>Projects</h1>
+        {{ range $index, $blurb := .Args.projects }}
+            {{ template "blurb" $blurb }}
+        {{end}}
+	</section>
+
+	{{- template "footer" }}
+</body>
+
+</html>
+{{end}}

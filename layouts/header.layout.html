@@ -1,8 +1,9 @@
 {{define "header"}}
-<header class="with-gutter">
-	<nav class="menu">	
-    <div class="name"><a href="/">James Holdren</a></div>
-    <a href="/posts.html"><div class="link {{if eq .Path "/posts.html" }} selected {{ end }}">All Posts</div></a>
+<header>
+	<nav class="menu with-gutter">
+    	<a href="/"><div class="link {{if eq .Path "/" }} selected {{ end }}">About Me</div></a>
+        <a href="/posts.html"><div class="link {{if eq .Path "/posts.html" }} selected {{ end }}">Posts</div></a>
+        <a href="/projects.html"><div class="link {{if eq .Path "/projects.html" }} selected {{ end }}">Projects</div></a>
 	</nav>
 </header>
 {{end}}

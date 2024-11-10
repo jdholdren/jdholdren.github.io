@@ -1,87 +1,125 @@
 {
-    "layouts": [
-        "./layouts/all_posts.layout.html",
-        "./layouts/blurb.layout.html",
-        "./layouts/footer.layout.html",
-        "./layouts/header.layout.html",
-        "./layouts/index.layout.html",
-        "./layouts/post.layout.html"
-    ],
-    "routes": {
-        "/static/css/main.css": {
-            "static_path": "/static/css/main.css",
-            "content_type": "text/css; charset=utf-8"
-        },
-        "/": {
-            "template": "index",
-            "args": {
-                "latest": [
-                    {
-                        "link": "/posts/go-garden.html",
-                        "title": "Garden of Go",
-                        "publish_date": "2022-12-31",
-                        "excerpt": "Curated links for Go resources."
-                    },
-                    {
-                        "link": "https://bignerdranch.com/blog/go-generics-in-api-design/",
-                        "title": "Go Generics in API Design",
-                        "publish_date": "2022-08-17",
-                        "excerpt": "Embracing generics in Go to build a better http handler."
-                    },
-                    {
-                        "link": "https://bignerdranch.com/blog/exploring-go-v1-18s-generics/",
-                        "title": "Exploring Go v1.18's Generics",
-                        "publish_date": "2021-12-01",
-                        "excerpt": "Generics in Go are nearly here! Here's what that means for you and some real use cases."
-                    }
-                ]
-            }
-        },
-        "/posts.html": {
-            "template": "allPosts",
-            "args": {
-                "posts": [
-                    {
-                        "link": "/posts/go-garden.html",
-                        "title": "Garden of Go",
-                        "publish_date": "2022-12-31",
-                        "excerpt": "Curated links for Go resources."
-                    },
-                    {
-                        "link": "https://bignerdranch.com/blog/go-generics-in-api-design/",
-                        "title": "Go Generics in API Design",
-                        "publish_date": "2022-08-17",
-                        "excerpt": "Embracing generics in Go to build a better http handler."
-                    },
-                    {
-                        "link": "https://bignerdranch.com/blog/exploring-go-v1-18s-generics/",
-                        "title": "Exploring Go v1.18's Generics",
-                        "publish_date": "2021-12-01",
-                        "excerpt": "Generics in Go are nearly here! Here's what that means for you and some real use cases."
-                    },
-                    {
-                        "link": "https://bignerdranch.com/blog/embracing-cloud-native/",
-                        "title": "Embracing Cloud Native",
-                        "publish_date": "2021-10-02",
-                        "excerpt": "What is cloud native and what does it really mean for our infrastructure?"
-                    },
-                    {
-                        "link": "https://bignerdranch.com/blog/using-the-httptest-package-in-golang/",
-                        "title": "Using the httptest package in Golang",
-                        "publish_date": "2021-09-14",
-                        "excerpt": "Using the httptest package to gain confidence in our HTTP handlers."
-                    }
-                ]
-            }
-        },
-        "/posts/go-garden.html": {
-            "template": "post",
-            "args": {
-                "title": "Garden of Go",
-                "publish_date": "2022-12-31",
-                "description": "Curated links for Go resources.",
-                "markdown": "./posts/2022_12_31_garden_of_go.md"
-            }
-        }
+  "layouts": [
+    "./layouts/all_posts.layout.html",
+    "./layouts/blurb.layout.html",
+    "./layouts/footer.layout.html",
+    "./layouts/header.layout.html",
+    "./layouts/index.layout.html",
+    "./layouts/post.layout.html",
+    "./layouts/projects.layout.html"
+  ],
+  "routes": {
+    "/static/css/main.css": {
+      "static_path": "/static/css/main.css",
+      "content_type": "text/css; charset=utf-8"
+    },
+    "/": {
+      "template": "index",
+      "args": {
+        "latest": [
+          {
+            "link": "/posts/go-garden.html",
+            "title": "Garden of Go",
+            "publish_date": "2022-12-31",
+            "excerpt": "Curated links for Go resources."
+          },
+          {
+            "link": "https://bignerdranch.com/blog/go-generics-in-api-design/",
+            "title": "Go Generics in API Design",
+            "publish_date": "2022-08-17",
+            "excerpt": "Embracing generics in Go to build a better http handler."
+          },
+          {
+            "link": "https://bignerdranch.com/blog/exploring-go-v1-18s-generics/",
+            "title": "Exploring Go v1.18's Generics",
+            "publish_date": "2021-12-01",
+            "excerpt": "Generics in Go are nearly here! Here's what that means for you and some real use cases."
+          }
+        ]
+      }
+    },
+    "/posts.html": {
+      "template": "allPosts",
+      "args": {
+        "posts": [
+          {
+            "link": "/posts/smolblog.html",
+            "title": "Smolblog",
+            "publish_date": "2024-11-10",
+            "excerpt": "The smallest webserver around Go templates powering my site."
+          },
+          {
+            "link": "/posts/go-garden.html",
+            "title": "Garden of Go",
+            "publish_date": "2022-12-31",
+            "excerpt": "Curated links for Go resources."
+          },
+          {
+            "link": "https://bignerdranch.com/blog/go-generics-in-api-design/",
+            "title": "Go Generics in API Design",
+            "publish_date": "2022-08-17",
+            "excerpt": "Embracing generics in Go to build a better http handler."
+          },
+          {
+            "link": "https://bignerdranch.com/blog/exploring-go-v1-18s-generics/",
+            "title": "Exploring Go v1.18's Generics",
+            "publish_date": "2021-12-01",
+            "excerpt": "Generics in Go are nearly here! Here's what that means for you and some real use cases."
+          },
+          {
+            "link": "https://bignerdranch.com/blog/embracing-cloud-native/",
+            "title": "Embracing Cloud Native",
+            "publish_date": "2021-10-02",
+            "excerpt": "What is cloud native and what does it really mean for our infrastructure?"
+          },
+          {
+            "link": "https://bignerdranch.com/blog/using-the-httptest-package-in-golang/",
+            "title": "Using the httptest package in Golang",
+            "publish_date": "2021-09-14",
+            "excerpt": "Using the httptest package to gain confidence in our HTTP handlers."
+          }
+        ]
+      }
+    },
+    "/posts/go-garden.html": {
+      "template": "post",
+      "args": {
+        "title": "Garden of Go",
+        "publish_date": "2022-12-31",
+        "description": "Curated links for Go resources.",
+        "markdown": "./posts/2022_12_31_garden_of_go.md"
+      }
+    },
+    "/posts/smolblog.html": {
+      "template": "post",
+      "args": {
+        "title": "Smolblog",
+        "publish_date": "2024-11-10",
+        "description": "The smallest webserver around Go templates powering my site.",
+        "markdown": "./posts/2024_11_10_smolblog.md"
+      }
+    },
+    "/projects.html": {
+      "template": "projects",
+      "args": {
+        "projects": [
+          {
+            "link": "./posts/smolblog.html",
+            "title": "Smolblog",
+            "excerpt": "A lightweight wrapper around rendering arbitray json with Go templates as a site."
+          },
+          {
+            "link": "https://github.com/bignerdranch/upfront",
+            "title": "Upfront",
+            "excerpt": "A wrapper for Go handlers that uses generics to clean up boilerplate (and remove some sharp edges)."
+          },
+          {
+            "link": "https://github.com/jdholdren/karma",
+            "title": "Karma",
+            "excerpt": "A simple karma-bot (webhook server) for awarding points to your friends in Discord."
+          }
+        ]
+      }
     }
+  }
 }
