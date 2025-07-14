@@ -1,0 +1,176 @@
+
+<!DOCTYPE HTML>
+<html lang="en">
+
+<head>
+  <title>Go Generics in API Design</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <meta name="description" content="Embracing generics in Go to build a better http handler.">
+  <link rel="stylesheet" href="/static/css/main.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+</head>
+
+<body>
+<header>
+	<nav class="menu with-gutter">
+    	<a href="/"><div class="link ">About Me</div></a>
+        <a href="/posts.html"><div class="link ">Posts</div></a>
+        <a href="/projects.html"><div class="link ">Projects</div></a>
+	</nav>
+</header>
+
+
+  <div class="post with-gutter">
+    <div class="publish-date">2022-08-17</div>
+    <h1 class="post-title">Go Generics in API Design</h1>
+
+    <p><em>This post was created from my time at Big Nerd Ranch, but they've since disbanded.
+I've moved the content here so it's still available.</em></p>
+<p>Go 1.18 has finally landed, and with it comes its own flavor of generics. In a previous post, we went over the accepted proposal and dove into the new syntax. For this post, I've taken the last example in the first post and turned it into a working library that uses generics to design a more type-safe API, giving a good look at how to use this new feature in a production setting. So grab yourself an update to Go 1.18, and settle in for how we can start to use our new generics to accomplish things the language couldn't before.</p>
+<h2>A note on when to use generics</h2>
+<p>Before we discuss how we're using generics in the library, I wanted to make a note: generics are just a tool that has been added to the language. Like many tools in the language, it's not recommended to use all of them all of the time. For example, you should try to handle errors before using <code>panic</code> since the latter will end up exiting your program. However, if you're completely unable to recover the program after an error, <code>panic</code> might be a perfectly fine option. Similarly, a sentiment has been circulating with the release of Go 1.18 about when to use generics. Ian Lance Taylor, whose name you may recognize from the accepted generics proposal, has a great quote in a talk of his:</p>
+<blockquote>
+<p>Write Go by writing code, not by designing types.</p>
+</blockquote>
+<p>This idea fits perfectly within the &quot;simple&quot; philosophy of Go: do the smallest, working thing to achieve our goal before evolving the solution to be more complex. For example, if you've ever found yourself writing similar functions to:</p>
+<pre><code class="language-go">func InSlice(s string, ss []string) bool {
+    for _, c := range ss {
+        if s != c {
+            continue
+        }
+
+        return true
+    }
+
+    return false
+}
+</code></pre>
+<p>And then you duplicate this function for other types, like <code>int</code>, it may be time to start thinking about codifying the more abstract behavior the code is trying to show us:</p>
+<pre><code class="language-go">func InSlice[T constraints.Ordered](t T, ts []T) bool {
+    for _, c := range ts {
+        if t != c {
+            continue
+        }
+
+        return true
+    }
+
+    return false
+}
+</code></pre>
+<p>Overall: don't optimize for the problems you haven't solved for yet. Wait to start designing generic types since your project will make abstractions become visible to you the more you work with it. A good rule of thumb here is to keep it simple until you can't.</p>
+<h2>Designing Upfront</h2>
+<p>Although we <em>just</em> discussed how we shouldn't try to design types before coding and learning the abstractions hidden in our project, there's an area where I believe we cannot and should not get away from designing the types first: API-first design. After all, once our server starts to respond to and accepts request bodies from clients, careless changes to either one can result in an application no longer working. However, the way we currently write HTTP handlers in Go has a bit of a lack of types. Let's go through all the ways this can subtly break or introduce issues to our server, starting with a pretty vanilla example:</p>
+<pre><code class="language-go">func ExampleHandler(w http.ResponseWriter, r *http.Request) {
+    var reqBody Body
+    if err := json.NewDecoder(r.Body).Decode(&amp;reqBody); err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+    }
+
+    resp, err := MyDomainFunction(reqBody)
+    if err != nil {
+        // Write out an error to the client...
+    }
+
+    byts, err := json.Marshal(resp)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+
+    w.Header().Set(&quot;Content-Type&quot;, &quot;application/json&quot;)
+    w.Write(byts)
+    w.WriteHeader(http.StatusCreated)
+}
+</code></pre>
+<p>Just to be clear on what this HTTP handler does: it ingests a body and decodes it from JSON, which can return an error. It then passes that decoded struct to <code>MyDomainFunction</code>, which gives us either a response or an error. Finally, we marshal the response back to JSON, set our headers, and write the response to the client.</p>
+<h3>Picking apart the function: Changing return types</h3>
+<p>Imagine a small change on the return type of the <code>MyDomainFunction</code> function. Say it was returning this struct:</p>
+<pre><code class="language-go">type Response struct {
+    Name string
+    Age int
+}
+</code></pre>
+<p>And now it returns this:</p>
+<pre><code class="language-go">type Response struct {
+    FirstName string
+    LastName string
+    Age int
+}
+</code></pre>
+<p>Assuming that <code>MyDomainFunction</code> compiles, so, too, will our example function. It's great that it still compiles, but this may not be a great thing since the response will change and a client may depend on a certain structure, e.g., there's no longer a <code>Name</code> field in the new response. Maybe the developer wanted to massage the response so it would look the same despite the change to <code>MyDomainFunction</code>. Worse yet is that since this compiles, we won't know this broke something until we deploy and get the bug report.</p>
+<h3>Picking apart the function: Forgetting to return</h3>
+<p>What happens if we forgot to return after we wrote our error from unmarshaling the request body?</p>
+<pre><code class="language-go">var reqBody RequestBody
+if err := json.NewDecoder(r.Body).Decode(&amp;reqBody); err != nil {
+    http.Error(w, err.Error(), http.StatusBadRequest)
+    return
+}
+</code></pre>
+<p>Because <code>http.Error</code> is part of an imperative interface for dealing with responses back to HTTP clients, it does not cause the handler to exit. Instead, the client will get their response, and go about their merry way, while the handler function continues to feed a zero-value <code>RequestBody</code> struct to <code>MyDomainFunction</code>. This may not be a complete error, depending on what your server does, but this is likely an undesired behavior that our compiler won't catch.</p>
+<h3>Picking apart the function: Ordering the headers</h3>
+<p>Finally, the most silent error is writing a header code at the wrong time or in the wrong order. For instance, I bet many readers didn't notice that the example function will write back a <code>200</code> status code instead of the <code>201</code> that the last line of the example wanted to return. The <code>http.ResponseWriter</code> API has an implicit order that requires that you write the header code before you call <code>Write</code>, and while you can read some documentation to know this, it's not something that is immediately called out when we push up or compile our code.</p>
+<h2>Being <code>Upfront</code> about it</h2>
+<p>Given all these (albeit minor) issues exist, how can generics help us to move away from silent or delayed failures toward compile-time avoidance of these issues? To answer that, I've written a small library called Upfront. It's just a collection of functions and type signatures to apply generics to these weakly-typed APIs in HTTP handler code. We first have library consumers implement this function:</p>
+<pre><code class="language-go">type BodyHandler[In, Out, E any] func(i BodyRequest[In]) Result[Out, E]
+</code></pre>
+<p>As a small review of the syntax, this function takes any three types for its parameters: <code>In</code>, for the type that is the output of decoding the body, <code>Out</code>, for the type you want to return, and <code>E</code> the possible error type you want to return to your client when something goes awry. Next, your function will accept an <code>upfront.BodyRequest</code> type, which is currently just a wrapper for the request and the JSON-decoded request body:</p>
+<pre><code class="language-go">// BodyRequest is the decoded request with the associated body
+type BodyRequest[T any] struct {
+    Request *http.Request
+    Body    T
+}
+</code></pre>
+<p>And finally, the <code>Result</code> type looks like this:</p>
+<pre><code class="language-go">// Result holds the necessary fields that will be output for a response
+type Result[T, E any] struct {
+    StatusCode int // If not set, this will be a 200: http.StatusOK
+
+    value      T
+    err        *E
+}
+</code></pre>
+<p>The above struct does most of the magic when it comes to fixing the subtle, unexpected pieces of vanilla HTTP handlers. Rewriting our function a bit, we can see the end result and work backward:</p>
+<pre><code class="language-go">func ExampleHandler[Body, DomainResp, error](in upfront.BodyRequest[Body]) Result[DomainResp, error] {
+    resp, err := MyDomainFunction(in.Body)
+    if err != nil {
+        return upfront.ErrResult(
+            fmt.Errorf(&quot;error from MyDomainFunction: %w&quot;),
+            http.StatusInternalServerError,
+        )
+    }
+
+    return upfront.OKResult(
+        resp,
+        http.StatusCreated,
+    )
+}
+</code></pre>
+<p>We've eliminated a lot of code, but hopefully, we've also eliminated a few of the &quot;issues&quot; from the original example function. You'll first notice that the JSON decoding and encoding are handled by the <code>upfront</code> package, so there's a few less places to forget <code>return</code>'s. We also use our new <code>Result</code> type to exit the function, and it takes in a status code. The <code>Result</code> type we're returning has a type parameter for what we want to send back from our handler. This means if <code>MyDomainFunction</code> changes its return type, the handler will fail compilation, letting us know we broke our contract with our callers long before we <code>git push</code>. Finally, the <code>Result</code> type also takes a status code, so it will handle the ordering of setting it at the right time (before writing the response).</p>
+<p>And what's with the two constructors, <code>upfront.ErrResult</code> and <code>upfront.OKResult</code>? These are used to set the package private fields <code>value</code> and <code>err</code> inside the <code>Result</code> struct. Since they're private, we can enforce that any constructors of the type can't set both <code>value</code> and <code>err</code> at the same time. In other languages, this would be similar (definitely not the same) to an Either type.</p>
+<h2>Final thoughts</h2>
+<p>This is a small example, but with this library, we can get feedback about silent issues at compile time, rather than when we redeploy the server and get bug reports from customers. And while this library is for HTTP handlers, this sort of thinking can apply to many areas of computer science and areas where we've been rather lax with our types in Go. With this blog and library, we've sort of reimplemented the idea of algebraic data types, which I don't see being added to Go in the foreseeable future. But still, it's a good concept to understand: it might open your mind to think about your current code differently.</p>
+<p>Having worked with this library in a sample project, there are a few areas for improvement that I hope we see in future patches. The first being that we cannot use type parameters on type aliases. That would save a bunch of writing and allow library consumers to create their own <code>Result</code> type with an implicit error type instead of having to repeat it everywhere. Secondly, the type inference is a little lackluster. It's caused the resulting code to be <em>very</em> verbose about the type parameters. On the other hand, Go has never embraced the idea of being terse. If you're interested in the library's source code, you can find it <a href="https://github.com/jdholdren/upfront">on GitHub</a>.</p>
+<p>All that being said, generics are ultimately a really neat tool. They let us add some type safety to a really popular API in the standard library without getting too much in the way. But as with any tool, use them sparingly and when they apply. As always: keep things simple until you can't.</p>
+
+
+  </div>
+<footer>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-W55GV9RJ5M"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-W55GV9RJ5M');
+  </script>
+</footer>
+
+</body>
+
+</html>

@@ -1,0 +1,262 @@
+
+<!DOCTYPE HTML>
+<html lang="en">
+
+<head>
+  <title>Exploring Go Generics</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <meta name="description" content="A deep dive into Go&#39;s generics feature.">
+  <link rel="stylesheet" href="/static/css/main.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+</head>
+
+<body>
+<header>
+	<nav class="menu with-gutter">
+    	<a href="/"><div class="link ">About Me</div></a>
+        <a href="/posts.html"><div class="link ">Posts</div></a>
+        <a href="/projects.html"><div class="link ">Projects</div></a>
+	</nav>
+</header>
+
+
+  <div class="post with-gutter">
+    <div class="publish-date">2021-12-01</div>
+    <h1 class="post-title">Exploring Go Generics</h1>
+
+    <p><em>This post was created from my time at Big Nerd Ranch, but they've since disbanded.
+I've moved the content here so it's still available.</em></p>
+<h1>Exploring Go v1.18's Generics</h1>
+<p>Go 1.18 is set to arrive in February 2022, and with it comes the long-awaited addition of generics to the language. It's been a long process to find something that works with the current Go ecosystem, but a proposal has been accepted that tries to protect the objectives of the language while adding the largest changes to the language in over a decade. Will developers add more complexity and make things less maintainable with generics? Or will this enable new heights and capabilities for gophers everywhere?</p>
+<p>In this post, we'll go over specifically what type parameters and constraints look like in Go 1.18, but we won't be covering every detail of the proposal itself: we'll be giving an overview enough to use them, and then some real-life examples of where generics are going to solve headaches for gophers. As such, no article will ever be a replacement for going over the proposal itself. It's quite long, but each piece is well explained and still approachable.</p>
+<h2>Getting set up</h2>
+<p>To start playing with generics (or really just the next Go version), there are two simple ways:</p>
+<h3>Go Playground</h3>
+<p>You can use the Go 2 playground in your browser to execute Go 1.18 samples. A word of caution—this uses a tool that was made to help those trying out the new syntax for proposals, and is no longer maintained. So if something doesn't work here, it's likely due to this tool not keeping up with changes since the specifications were finalized.</p>
+<h3>gotip</h3>
+<p>This tool is used to compile and run the Go development branch on your local machine without replacing your normal <code>go</code> terminal tools.</p>
+<ul>
+<li><code>go install golang.org/dl/gotip@latest</code></li>
+<li><code>gotip download</code></li>
+<li>Set your version to <code>1.18</code> in your <code>go.mod</code> file for your repo directory.</li>
+</ul>
+<p>Once that's all done, the <code>gotip</code> command can be used anywhere you've been using the stable <code>go</code> command, e.g. <code>gotip test ./...</code>.</p>
+<h2>Type parameters</h2>
+<p>The big change enabling generic structures and data types is the introduction of a <em>type-parameter</em> for type aliases, structs, methods, and standalone functions. Here's some sample syntax for a generic-looking <code>Node</code> type:</p>
+<pre><code class="language-go">type Node[T any] struct {
+    Value T
+    Left  *Node[T]
+    Right *Node[T]
+}
+</code></pre>
+<p>This looks a lot like the existing Go code (which is great), just the addition of <code>T any</code> inside of square brackets. We can read that as a normal parameter to a function, like <code>id string</code>, except this refers to a type that will determine what type the <code>Value</code> field will hold. This could be any type you want, as specified by the <code>any</code> <em>type constraint</em> that we'll touch on later.</p>
+<p>You can instantiate a generic type like this:</p>
+<pre><code class="language-go">node := Node[int]{}
+</code></pre>
+<p>In this snippet, we've added square brackets behind the type name to specify that <code>int</code> is the type-parameter, which creates an instance of the <code>Node</code> struct, except it's typed such that its <code>Value</code> field is an <code>int</code>. You can omit to specify the type-parameter and allow the compiler to infer the type being used:</p>
+<pre><code class="language-go">node := Node{
+    Value: 17,
+}
+</code></pre>
+<p>Similar to the example above, this results in a <code>Node</code> type that holds an <code>int</code>. Type parameters can also be used on methods belonging to a generic struct, like so:</p>
+<pre><code class="language-go">func (n Node[T]) Val() T {
+    return n.Value
+}
+</code></pre>
+<p>But they're really pointing to the types on the receiver (Node) type; methods cannot have type parameters, they can only reference parameters already declared on the base type. If a method doesn't need type parameters or all <em>x</em> number of them, it can omit them entirely or leave out a few.</p>
+<p>Type alias declarations can also accept parameters:</p>
+<pre><code class="language-go">type Slice[T any] []T
+</code></pre>
+<p>Without generics, library authors would write this to accommodate any type:</p>
+<pre><code class="language-go">type Node struct {
+    Value interface{}
+    Left  *Node
+    Right *Node
+}
+</code></pre>
+<p>Using this <code>Node</code> definition, library consumers would have to cast each time each time the <code>Value</code> field was accessed:</p>
+<pre><code class="language-go">v, ok := node.Value.(*myType)
+if !ok {
+    // Do error handling...
+}
+</code></pre>
+<p>Additionally, <code>interface{}</code> can be dangerous by allowing <em>any</em> type, even different types for separate instances of the <code>struct</code> like so:</p>
+<pre><code class="language-go">node := Node{
+    Value: 62,
+    Left: &amp;Node{
+        Value: &quot;64&quot;,
+    },
+    Right: &amp;Node{
+        Value: []byte{},
+    },
+}
+</code></pre>
+<p>This results in a very unwieldy tree of heterogeneous types, yet it still compiles. Not only can casting types be tiresome, each time that a typecast happens you open yourself to an error happening at runtime, possibly in front of a user or critical workload. But when the compiler handles type safety and removes the need for casting, a number of bugs and mishaps are avoided by giving us errors that prevent the program from building. This is a great argument in favor of strong-type systems: errors at compilation are easier to fix than debugging bugs at runtime when they're already in production.</p>
+<p>Generics solve a longstanding complaint where library authors have to resort to using <code>interface{}</code>, or manually creating variants of the same structure, or even use code generation just to define functions that could accept different types. With the addition of generics, it removes a lot of headache and effort from common developer use cases.</p>
+<h2>Type constraints</h2>
+<p>Back to the <code>any</code> keyword that was mentioned earlier. This is the other half of the generics implementation, called a <em>type constraint,</em> and it tells the compiler to narrow down what types can be used in the type parameter. This is useful for when your generic struct can take most things, but needs a few details about the type it's referring to, like so:</p>
+<pre><code class="language-go">func length[T any](t T) int {
+    return len(t)
+}
+</code></pre>
+<p>This won't compile, since <code>any</code> could allow an <code>int</code> or any sort of struct or interface, so calling <code>len</code> on those would fail. We can define a constraint to help with this:</p>
+<pre><code class="language-go">type LengthConstraint interface {
+    string | []byte
+}
+
+func length[T LengthConstraint](t T) int {
+    return len(t)
+}
+</code></pre>
+<p>This type of constraint defines a <em>typeset</em>: a collection of types (separated by a pipe delimiter) that we're allowing as good answers to the question of what can be passed to our generic function. Because we've only allowed two types, the compiler can verify that <code>len</code> works on both of those types; the compiler will check that we can call <code>len</code> on a string (yes) and a byte array (also yes). What if someone hands us a type alias with <code>string</code> as the underlying type? That won't work since the type alias is a new type altogether and not in our set. But worry not, we can use a new piece of syntax:</p>
+<pre><code class="language-go">type LengthConstraint interface {
+    ~string | ~[]byte
+}
+</code></pre>
+<p>The tilde character specifies an approximation constraint <code>~T</code> that can be fulfilled by types that use <code>T</code> as an underlying type. This makes values of <code>type info []byte</code> satisfactory arguments to our <code>length</code> function:</p>
+<pre><code class="language-go">type info []byte
+
+func main() {
+    var i info
+    a := length(i)
+    fmt.Printf(&quot;%#v&quot;, a)
+}
+</code></pre>
+<p>Type constraints can also enforce that methods are present, just like regular interfaces:</p>
+<pre><code class="language-go">type LengthConstraint interface {
+    ~string | ~[]byte
+    String() string
+}
+</code></pre>
+<p>This reads as before, making sure that the type is either based on a string or byte array, but now ensures implementing types also have a method called <code>String</code> that returns a <code>string</code>. A quick note: the compiler won't stop you from defining a constraint that's impossible to implement, so be careful:</p>
+<pre><code class="language-go">type Unsatifiable interface {
+    int
+    String() string
+}
+</code></pre>
+<p>Finally, Go 1.18 will also add a package called <code>constraints</code> that will define some utility type sets, like <code>constraints.Ordered</code>, which will contain all types that the less than or greater than operators can use. So don't feel like you need to redefine your own constraints all the time, odds are you'll have one defined by the standard library already.</p>
+<h3>No type erasure</h3>
+<p>Go's proposal for generics also mentions that there will not be any type of erasure when using them. That is, all compile-time information about the types used in a generic function will still be available at runtime; no specifics about type-parameters will be lost when using <code>reflect</code> on instances of generic functions and structs. Consider this example of type erasure in Java:</p>
+<pre><code class="language-java">// Example generic class
+public class ArrayList&lt;E extends Number&gt; {
+    // ...
+};
+
+ArrayList&lt;Integer&gt; li = new ArrayList&lt;Integer&gt;();
+ArrayList&lt;Float&gt; lf = new ArrayList&lt;Float&gt;();
+if (li.getClass() == lf.getClass()) { // evaluates to true
+    System.out.println(&quot;Equal&quot;);
+}
+</code></pre>
+<p>Despite the classes having differing types contained within, that information goes away at runtime, which can be useful to prevent code from relying on information being abstracted away.</p>
+<p>Compare that to a similar example in Go 1.18:</p>
+<pre><code class="language-go">type Numeric interface {
+    int | int64 | uint | float32 | float64
+}
+
+type ArrayList[T Numeric] struct {}
+
+var li ArrayList[int64]
+var lf ArrayList[float64]
+if reflect.TypeOf(li) == reflect.TypeOf(lf) { // Not equal
+    fmt.Printf(&quot;they're equal&quot;)
+    return
+}
+</code></pre>
+<p>All of the type information is retained when using <code>reflect.TypeOf</code>, which can be important for those wanting to know about what sort of type was passed in and want to act accordingly. However, it should be noted that no information will be provided about the constraint or approximation constraint that the type matched. For example, say we had a parameter of <code>type MyType string</code> that matched a constraint of <code>~string</code>, reflect will only tell us about <code>MyType</code> and not the constraint that it fulfilled.</p>
+<h2>Real-life example</h2>
+<p>There will be many examples of generics being used in traditional computer science data models, especially as the Go community adopts generics and updates their libraries after their release. But to finish out this tour of generics, we'll look at a real-life example of something that gophers work with almost every single day: HTTP handlers. Gophers will always remember the function signature of a vanilla HTTP handler:</p>
+<pre><code class="language-go">func(w http.ResponseWriter, r *http.Request)
+</code></pre>
+<p>Which honestly doesn't say much about what the function can take in or return. It can write anything back out of it and we'd have to manually call the function to get the response for unmarshaling and testing.</p>
+<p>What follows is a function for constructing HTTP handlers out of functions that take in and return useful types rather than writers and requests that say nothing about the problem domain.</p>
+<pre><code class="language-go">package main
+
+import (
+    &quot;encoding/json&quot;
+    &quot;fmt&quot;
+    &quot;net/http&quot;
+)
+
+func AutoDecoded[T any, O any](f func(body T, r *http.Request) (O, error)) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        // Decode the body into t
+        var t T
+        if err := json.NewDecoder(r.Body).Decode(&amp;t); err != nil {
+            http.Error(w, fmt.Sprintf(&quot;error decoding body: %s&quot;, err), http.StatusBadRequest)
+            return
+        }
+
+        // Call the inner function
+        result, err := f(t, r)
+        if err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+            return
+        }
+
+        marshaled, err := json.Marshal(result)
+        if err != nil {
+            http.Error(w, fmt.Sprintf(&quot;error marshaled response: %s&quot;, err), http.StatusInternalServerError)
+            return
+        }
+
+        if _, err := w.Write(marshaled); err != nil {
+            http.Error(w, fmt.Sprintf(&quot;error writing response: %s&quot;, err), http.StatusInternalServerError)
+            return
+        }
+    }
+}
+
+type Hello struct {
+    Name string `json:&quot;name&quot;`
+}
+
+type HelloResponse struct {
+    Greeting string `json:&quot;greeting&quot;`
+}
+
+func handleApi(body Hello, r *http.Request) (HelloResponse, error) {
+    return HelloResponse{
+        Greeting: fmt.Sprintf(&quot;Hello, %s&quot;, body.Name),
+    }, nil
+}
+
+func main() {
+    mux := http.NewServeMux()
+    mux.HandleFunc(&quot;/api&quot;, AutoDecoded(handleApi))
+
+    http.ListenAndServe(&quot;:3000&quot;, mux)
+}
+</code></pre>
+<p><code>AutoDecoded</code> is a generic function with two type parameters: <code>T</code> and <code>O</code>. These types represent the incoming body type we should expect from the request, and the output type we expect to hand back to the requester, respectively. Looking at the rest of <code>AutoDecoded</code>'s function signature, we see that it wants a function that maps an instance of <code>T</code> and an <code>*http.Request</code> to an instance of <code>Result[O]</code>. Stepping through <code>AutoDecoded</code>'s logic, it starts by decoding the incoming JSON request into an instance of <code>T</code>. With the body stored in a variable, the function is ready to call the inner function that was provided as the argument using variable <code>t</code>. <code>AutoDecoded</code> then handles if the inner function errored, and if it didn't, then takes the output and writes it back to the client as JSON.</p>
+<p>Below <code>AutoDecoded</code> is our HTTP handler called <code>handleApi</code>, and we can see that it doesn't follow the normal patter for an <code>http.HandlerFunc</code>; this function accepts and returns types <code>Hello</code> and <code>HelloResponse</code> defined above it. Compared to a function using an <code>http.ResponseWriter</code>, this <code>handleApi</code> function is a lot easier to test since it returns a specific type or error, rather than writing bytes back out. Plus, the types on this function now serve as a bit of documentation: other developers reading this can look at <code>handleApi</code>'s type signature and know what it is expecting and what it will return. Finally, the compiler can tell us if we're trying to return the wrong type from our handler. Before you could write anything back to the client and the compiler wouldn't care:</p>
+<pre><code class="language-go">func(w http.ResponseWriter, r *http.Request) {
+    // Decoding logic...
+
+    // Our client was expecting a `HelloResponse`!
+    w.Write([]byte(&quot;something else entirely&quot;))
+}
+</code></pre>
+<p>In the <code>main</code> function, we see a bit of type-parameter inference happen when we no longer need to specify the type parameters when linking the pieces together in <code>AutoDecoded(handleApi)</code>. Since <code>AutoDecoded</code> returns an <code>http.Handler</code>, we can take the result of the function call and plug it into any Go router, like the <code>http.ServeMux</code> used here. And with that, we've introduced more concrete types into our program.</p>
+<p>As you can hopefully now see, it's going to be nice to have compiler functionality in Go to help us write more generic types and functions while avoiding the warts of the language where we might resort to using <code>interface{}</code>. The introduction of type parameters will be a gradual process overall, as Russ Cox has made the suggestion to not touch the existing standard library types or structures in the next Go release. Even if you don't want to use generics, this next release will be compatible with your existing code, so adopt what features make sense for your project and team. Congrats to the Go team on another release, and congrats to the gophers who have patiently awaited these features for so long. Have fun being generic!</p>
+
+
+  </div>
+<footer>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-W55GV9RJ5M"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-W55GV9RJ5M');
+  </script>
+</footer>
+
+</body>
+
+</html>
