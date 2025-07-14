@@ -1,0 +1,154 @@
+
+<!DOCTYPE HTML>
+<html lang="en">
+
+<head>
+  <title>Using the httptest package in Golang</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <meta name="description" content="Using the httptest package to gain confidence in our HTTP handlers.">
+  <link rel="stylesheet" href="/static/css/main.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+</head>
+
+<body>
+<header>
+	<nav class="menu with-gutter">
+    	<a href="/"><div class="link ">About Me</div></a>
+        <a href="/posts.html"><div class="link ">Posts</div></a>
+        <a href="/projects.html"><div class="link ">Projects</div></a>
+	</nav>
+</header>
+
+
+  <div class="post with-gutter">
+    <div class="publish-date">2021-09-14</div>
+    <h1 class="post-title">Using the httptest package in Golang</h1>
+
+    <p><em>This post was created from my time at Big Nerd Ranch, but they've since disbanded.
+I've moved the content here so it's still available.</em></p>
+<h2>Testing at the edge</h2>
+<p>Testing your code is a great practice, and can give confidence to the developers shipping it to production. Unit and integration tests are great for testing things like application logic or independent pieces of functionality, but there are other areas of code at the &quot;edges&quot; of the application that are a bit harder to test because they deal with incoming or outgoing requests from third parties. Luckily Go has baked into its standard library the httptest package, a small set of structures and functions to help create end-to-end tests for these edges of your application.</p>
+<h2>Using the ResponseRecorder and NewRequest</h2>
+<p>A common &quot;edge&quot; in a Go application is where a server exposes <code>http.Handler</code> functions to respond to web traffic. Normally, to test these, it would require standing up your server somewhere, but the <code>httptest</code> package gives us <code>NewRequest</code> and <code>NewRecorder</code> to help simplify these sorts of test cases.</p>
+<h3>Testing an HTTP handler</h3>
+<p>This test calls an HTTP handler function and checks it a few behaviors, namely: a 200 response code is sent back and a header with the API version is returned.</p>
+<pre><code class="language-go">func Handler(w http.ResponseWriter, r *http.Request) {
+    // Tell the client that the API version is 1.3
+    w.Header().Add(&quot;API-VERSION&quot;, &quot;1.3&quot;)
+    w.Write([]byte(&quot;ok&quot;))
+}
+
+func TestHandler(t *testing.T) {
+    req := httptest.NewRequest(http.MethodGet, &quot;http://example.com&quot;, nil)
+    w := httptest.NewRecorder()
+
+    Handler(w, req)
+
+    // We should get a good status code
+    if want, got := http.StatusOK, w.Result().StatusCode; want != got {
+        t.Fatalf(&quot;expected a %d, instead got: %d&quot;, want, got)
+    }
+
+    // Make sure that the version was 1.3
+    if want, got := &quot;1.3&quot;, w.Result().Header.Get(&quot;API-VERSION&quot;); want != got {
+        t.Fatalf(&quot;expected API-VERSION to be %s, instead got: %s&quot;, want, got)
+    }
+}
+</code></pre>
+<p><code>httptest.NewRequest</code> provides a convenience wrapper around <code>http.NewRequest</code> so you don't have to check the error making a <code>Request</code> object. Below that <code>httptest.NewRecorder</code> makes a recorder that the HTTP handler writes to as its <code>http.ResponseWriter</code>, and it captures all of the changes that would have been returned to a client caller. Using this, there's no need to start your server: just hand the recorder directly to the function and it invokes it the same way it would if the request came in over HTTP. After the handler call, the recorder's <code>Result</code> call provides the values written to it for checking any behaviors you may need to to assert in the rest of your test.</p>
+<h2>Using the Test Server</h2>
+<p>While servers often intake requests, there's another &quot;edge&quot; to be tested on the other side where a server makes outbound requests. Testing these behaviors can be difficult since it requires that you either mock the code calling out or call out to the real thing (maybe even a test instance). Thankfully <code>httptest</code> gives us <code>Server</code>, a way to start a local server to respond to real HTTP requests inside of a test.</p>
+<h3>Test Setup</h3>
+<pre><code class="language-go">func TestTrueSundayResponseReturnsTrue(t *testing.T) {
+    // Create a server that returns a static JSON response
+    s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        w.Write([]byte(`{&quot;isItSunday&quot;: true}`))
+    }))
+    // Be sure to clean up the server or you might run out of file descriptors!
+    defer s.Close()
+
+    // The pretend client under test
+    c := client.New()
+
+    // Ask the client to reach out to the server and see if it's Sunday
+    if !c.Sunday(s.URL) {
+        t.Fatalf(&quot;expected client to return true!&quot;)
+    }
+}
+</code></pre>
+<p><code>httptest.NewServer</code> accepts an <code>http.Handler</code>, so for this test, we gave it a function that responds in JSON that it's Sunday. When you make a new test server, it binds to a random free port on the local machine, but we can access the URL it exposed by passing the <code>URL</code> field on the server struct to the client code. From there, the client can make an actual request to a server, not a mock, and parse the response like it would in production. Note that you should clean up the server by calling <code>Close</code> when the test finishes to free up resources or you may find yourself out of available ports for running further tests.</p>
+<h2>Leveraging the http.Handler interface</h2>
+<p>Because <code>NewServer</code> accepts an instance of an <code>http.Handler</code>, the test server can do a lot more than just return static responses, like providing multiple route handlers. In the next example, the test server will provide two endpoints:</p>
+<ul>
+<li><code>/token</code> which returns some secret created during the test.</li>
+<li><code>/resource</code> returns what day it is, but only from requests that have the secret bearer token in their header.</li>
+</ul>
+<p>The goal of this test is to ensure that the client code calls <em>both</em> endpoints and takes information from one endpoint and properly passes it to the other.</p>
+<pre><code class="language-go">func TestPseudOAuth(t *testing.T) {
+    // Make a secret for the instance of this test
+    secret := fmt.Sprintf(&quot;secret_%d&quot;, time.Now().Unix())
+
+    // Implements the http.Handler interface to be passed to httptest.NewServer
+    mux := http.NewServeMux()
+
+    // The /resource handler checks the headers for a non-expired token.
+    // It returns a 401 if it is, otherwise returns the treasure inside.
+    mux.HandleFunc(&quot;/resource&quot;, func(w http.ResponseWriter, r *http.Request) {
+        auth := r.Header.Get(&quot;Auth&quot;)
+        if auth != secret {
+            http.Error(w, &quot;Auth header was incorrect&quot;, http.StatusUnauthorized)
+            return
+        }
+
+        // Header was good, tell 'em what day it is
+        w.Write([]byte(`{ &quot;day&quot;: &quot;Sunday&quot; }`))
+    })
+
+    // The /token handler mints a new token that's good for 5 minutes to
+    // access the /resource endpoint
+    mux.HandleFunc(&quot;/token&quot;, func(w http.ResponseWriter, r *http.Request) {
+        w.Write([]byte(secret))
+    })
+
+    s := httptest.NewServer(mux)
+    defer s.Close()
+
+    // The pretend client under test
+    c := client.New()
+
+    // Make the call and make sure it's Sunday
+    got, err := c.GetDay(s.URL)
+    if err != nil {
+        t.Fatalf(&quot;unexpected error: %s&quot;, err)
+    }
+    if want := &quot;Sunday&quot;; want != got {
+        t.Fatalf(&quot;I thought it was %s! Instead it's: %s&quot;, want, got)
+    }
+}
+</code></pre>
+<p>This test looks a lot like the previous one, except we're passing a different implementation of an <code>http.Handler</code> to the test server. Although the code uses <code>http.NewServeMux</code>, you can use anything, like gorilla/mux, so long as it implements the interface. Just by changing the <code>http.Handler</code> to be a more elaborate route handler, the tests can make more detailed assertions about outgoing HTTP requests and flows.</p>
+<h2>Avoiding fragile End-To-End tests</h2>
+<p>End-To-End tests by nature call every part of your application required to serve a request, and so they can rely on quite a few components within your code to function. While they're great for adding test coverage and spreading that coverage to the very edges of your application, they can also be flakier than their unit/integration test counterparts. To avoid writing flaky tests, be sure to only test for observable behaviors and avoid testing for the internals as those are more likely to change than the output of the feature under test.</p>
+<h2>Conclusion</h2>
+<p>Go's <code>httptest</code> package provides a small, but incredibly useful set of tools for testing the edge portions of HTTP handling code, both for servers and their clients. It provides some neat tools to add test coverage to the &quot;edges&quot; of your applications using real servers and requests. Best of all, it's included in Go's standard library, so the Continuous Integration pipeline for your Go code already has support for it without further hassle. If you have any interest in the additional utilities the <code>httptest</code> package provides, you can read the documentation itself. Additionally, if you need to test external dependencies like databases or other dockerized applications, you might want to check out Ory Dockertest.</p>
+
+
+  </div>
+<footer>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-W55GV9RJ5M"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-W55GV9RJ5M');
+  </script>
+</footer>
+
+</body>
+
+</html>

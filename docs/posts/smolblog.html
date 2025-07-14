@@ -147,7 +147,7 @@ Now here's the template for <code>post</code>:</p>
 </code></pre>
 <p>Honestly, I could probably clean this up a bit more by moving the <code>head</code> into the header template, but this makes for a good example.
 You'll notice a <code>renderMarkdown</code> call in there, which is a built-in function to <code>smolblog</code> to handle the markdown requirement.
-That might have been the simplest part of this all since it's a call to the <a href="github.com/yuin/goldmark">github.com/yuin/goldmark</a> package.</p>
+That might have been the simplest part of this all since it's a call to the <a href="https://github.com/yuin/goldmark">github.com/yuin/goldmark</a> package.</p>
 <h1>Rendering and Hosting</h1>
 <p>To render your site, just call <code>smallblog</code> with the <code>--output</code> flag, telling it where to save your generated site.
 Under the hood, it's using <code>wget</code> with a number of flags to properly use the incantation:</p>
