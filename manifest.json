@@ -55,25 +55,25 @@
             "excerpt": "Curated links for Go resources."
           },
           {
-            "link": "https://bignerdranch.com/blog/go-generics-in-api-design/",
+            "link": "/posts/go-generics-api-design.html",
             "title": "Go Generics in API Design",
             "publish_date": "2022-08-17",
             "excerpt": "Embracing generics in Go to build a better http handler."
           },
           {
-            "link": "https://bignerdranch.com/blog/exploring-go-v1-18s-generics/",
+            "link": "/posts/exploring-go-generics.html",
             "title": "Exploring Go v1.18's Generics",
             "publish_date": "2021-12-01",
             "excerpt": "Generics in Go are nearly here! Here's what that means for you and some real use cases."
           },
           {
-            "link": "https://bignerdranch.com/blog/embracing-cloud-native/",
+            "link": "/posts/embracing-cloud-native.html",
             "title": "Embracing Cloud Native",
             "publish_date": "2021-10-02",
             "excerpt": "What is cloud native and what does it really mean for our infrastructure?"
           },
           {
-            "link": "https://bignerdranch.com/blog/using-the-httptest-package-in-golang/",
+            "link": "/posts/using-httptest-package-golang.html",
             "title": "Using the httptest package in Golang",
             "publish_date": "2021-09-14",
             "excerpt": "Using the httptest package to gain confidence in our HTTP handlers."
@@ -97,6 +97,42 @@
         "publish_date": "2024-11-10",
         "description": "The smallest webserver around Go templates powering my site.",
         "markdown": "./posts/2024_11_10_smolblog.md"
+      }
+    },
+    "/posts/go-generics-api-design.html": {
+      "template": "post",
+      "args": {
+        "title": "Go Generics in API Design",
+        "publish_date": "2022-08-17",
+        "description": "Embracing generics in Go to build a better http handler.",
+        "markdown": "./posts/2022_08_17_generic_api_patterns.md"
+      }
+    },
+    "/posts/exploring-go-generics.html": {
+      "template": "post",
+      "args": {
+        "title": "Exploring Go Generics",
+        "publish_date": "2021-12-01",
+        "description": "A deep dive into Go's generics feature.",
+        "markdown": "./posts/2021_12_01_exploring_go_generics.md"
+      }
+    },
+    "/posts/embracing-cloud-native.html": {
+      "template": "post",
+      "args": {
+        "title": "Embracing Cloud Native",
+        "publish_date": "2021-10-02",
+        "description": "What is cloud native and what does it really mean for our infrastructure?",
+        "markdown": "./posts/2021_10_02_embracing_cloud_native.md"
+      }
+    },
+    "/posts/using-httptest-package-golang.html": {
+      "template": "post",
+      "args": {
+        "title": "Using the httptest package in Golang",
+        "publish_date": "2021-09-14",
+        "description": "Using the httptest package to gain confidence in our HTTP handlers.",
+        "markdown": "./posts/2021_09_14_using_httptest_package_golang.md"
       }
     },
     "/projects.html": {
