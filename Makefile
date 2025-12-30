@@ -8,3 +8,4 @@ tools:
 
 docs:
 	smolblog -manifest=manifest.json -output=docs
+	echo 'jamesholdren.com' > ./docs/CNAME
