@@ -18,6 +18,12 @@
       "args": {
         "latest": [
           {
+            "link": "/posts/winter-reading-list.html",
+            "title": "Your Winter Reading List: Keeping it Simple",
+            "publish_date": "2026-02-16",
+            "excerpt": "Simplicity in engineering practices and a curated winter reading list."
+          },
+          {
             "link": "/posts/static-analysis-fun-profit.html",
             "title": "Static Analysis for Fun and Profit - Part 1",
             "publish_date": "2025-07-14",
@@ -28,12 +34,6 @@
             "title": "Smolblog",
             "publish_date": "2024-11-10",
             "excerpt": "The smallest webserver around Go templates powering my site."
-          },
-          {
-            "link": "/posts/go-garden.html",
-            "title": "Garden of Go",
-            "publish_date": "2022-12-31",
-            "excerpt": "Curated links for Go resources."
           }
         ]
       }
@@ -42,6 +42,12 @@
       "template": "allPosts",
       "args": {
         "posts": [
+          {
+            "link": "/posts/winter-reading-list.html",
+            "title": "Your Winter Reading List: Keeping it Simple",
+            "publish_date": "2026-02-16",
+            "excerpt": "Simplicity in engineering practices and a curated winter reading list."
+          },
           {
             "link": "/posts/static-analysis-fun-profit.html",
             "title": "Static Analysis for Fun and Profit - Part 1",
@@ -85,6 +91,15 @@
             "excerpt": "Using the httptest package to gain confidence in our HTTP handlers."
           }
         ]
+      }
+    },
+    "/posts/winter-reading-list.html": {
+      "template": "post",
+      "args": {
+        "title": "Your Winter Reading List: Keeping it Simple",
+        "publish_date": "2026-02-16",
+        "description": "Simplicity in engineering practices and a curated winter reading list.",
+        "markdown": "./posts/2026_02_16_winter_reading_list.md"
       }
     },
     "/posts/static-analysis-fun-profit.html": {
